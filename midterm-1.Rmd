@@ -1,0 +1,214 @@
+---
+title: "STAT 345 Midterm Project"
+font: 12pt
+date: "4/2/26"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r, echo = FALSE}
+# Loading required packages
+library(hoopR) # hoopR is used to get the basketball data
+library(tidyverse)
+library(ggthemes)
+library(stringr)
+library(ggplot2)
+```
+
+```{r, echo = FALSE}
+# Loads play-by-play for all NBA teams in given seasons
+pbp <- load_nba_pbp(seasons = 2018:2025)
+
+# Filters only shooting plays by the Timberwolves
+wolves_shots <- pbp %>%
+  filter(shooting_play == TRUE, team_id == 16)
+
+# Narrows the data set down to shot location, season occurred, and scoring play by using select so it easier to look at
+# The scoring play will be the result of whether the shot was made or missed
+wolves_shots_raw <- wolves_shots %>% 
+  select(scoring_play, coordinate_x_raw, coordinate_y_raw, season)
+
+# Adds a column to better show if a shot was made or missed
+# Made or missed will be used important for the plots
+wolves_shots_result <- wolves_shots_raw %>%
+  mutate(result = factor(scoring_play,
+                    levels = c(TRUE, FALSE),
+                    labels = c("Made", "Missed")))
+
+```
+
+```{r, echo = FALSE}
+# Drawing the NBA court
+draw_court_scaled <- function(color = "black") { 
+  
+  # Function used to create circle that will be used for court drawing
+  circle <- function(center = c(0, 0), r = 1, npoints = 100) {
+    data.frame(x = center[1] + r * cos(seq(0, 2*pi, length.out = npoints)),
+      y = center[2] + r * sin(seq(0, 2*pi, length.out = npoints)))
+  }
+
+# Defines angles for 3-point arc
+theta = seq(acos(22/23), acos(-22/23), length.out = 200)
+
+  # List of important NBA court markings to draw court
+  list(
+    # Outer boundary
+    geom_rect(aes(xmin = 0, xmax = 50, ymin = 0, ymax = 48),
+              fill = NA, color = color),
+
+    # Hoop
+    geom_path(data = circle(c(25, 5), 1.5), aes(x, y), color = color),
+
+    # Backboard
+    geom_segment(aes(x = 22, y = 4, xend = 28, yend = 4), color = color),
+    
+    # Restricted area
+    geom_path(data = data.frame(x = 25 + 4 * cos(seq(0, pi, length.out = 100)),
+    y = 5 + 4 * sin(seq(0, pi, length.out = 100))),
+    aes(x, y), color = color),
+
+    # Paint
+    geom_rect(aes(xmin = 17, xmax = 33, ymin = 0, ymax = 19),
+              fill = NA, color = color),
+
+    # Free throw circle
+    geom_path(data = circle(c(25, 19), 6), aes(x, y), color = color),
+
+    # 3-point arc
+    geom_path(data = data.frame(x = 25 + 23 * cos(theta), y = 5 + 23 * sin(theta)),
+      aes(x, y), color = color),
+
+    # Corner 3 lines
+    geom_segment(aes(x = 3, y = 0, xend = 3, yend = 12), color = color),
+    geom_segment(aes(x = 47, y = 0, xend = 47, yend = 12), color = color)
+  )
+}
+# Combining all the knowledge together to plot the shots
+ggplot(wolves_shots_result, aes(x = coordinate_x_raw, y = coordinate_y_raw + 4)) + 
+  # Added 4 to y to shift shots to better fit court drawing as basket is considered 0 and anything below is negative 
+  
+  # NBA court that was created in above code
+  draw_court_scaled() +
+  
+  # Reduces overlap from similar shot coordinates and improves visibility of shot density patterns
+  geom_jitter(aes(color = result), width = .35, height = .35, alpha = 0.4, size = 1) +
+  
+  # Creates separate plots for each season
+  facet_wrap(~season, nrow = 2) +
+  
+  
+  # Customized colors to reflect team colors
+  # Colors will reflect made or missed shot
+  scale_color_manual(
+    values = c("Missed" = "grey", "Made" = "navy"),
+    labels = c("Made", "Missed")) +
+  
+  # Set limits to match court dimensions
+  coord_fixed(xlim = c(0, 50), ylim = c(0, 47)) +
+  
+  # Adding title and labels
+  labs(title = "Minnesota Timberwolves Shot Chart",
+    subtitle = "Seasons 2018-2025", color = "Shot Result") +
+  
+  # Removes grid background
+  theme_void()
+
+```
+
+## Executive Summary
+
+-   Shot selection has shifted toward more perimeter shooting over time
+
+-   Increased clustering of shots beyond the 3-point arc in recent
+    seasons
+
+-   Mid-range shot attempts have declined significantly
+
+-   Shot distribution near the basket remains consistent and
+    high-frequency
+
+-   No major change in overall shot success patterns, but efficiency
+    appears higher in modern shot zones
+
+## Detailed Explanation
+
+#### Increase in Perimeter Shooting
+
+Gradually the Timberwolves are taking a larger portion of shots beyond
+the 3-point arc. This follows the league wide trend emphasizing spacing and
+higher-value shots.
+
+#### Growth in 3-Point Shot Clusters
+
+Recent seasons show greater denser shot cluster along the 3-point arc
+and corner 3's. With shots beyond the arc being worth more points teams
+are starting to shoot there more to maximize their points per
+possession.
+
+#### Decline in Mid-Range Shot Attempts
+
+The mid-range shots have significantly declined over the years. This aligns with modern analytics on discouraging lower-efficiency shots. Mid-range is lower-efficiency because they are not as high percentage as close shots and worth as much as 3-point shots.
+
+#### Consistent Rim Attacks
+
+Shots in the paint and near the rim continue to be highly populated.
+These are typically higher percentage looks giving teams a great
+opportunity to maximize scoring efficiency.
+
+#### Efficiency Patterns
+
+With less mid-range shots, more 3-point, and a high frequency of close
+shots teams are trending towards shooting the shots that give them the
+best expected value and efficiency. The high success of close shots
+keeps players shooting them and higher value of 3-pointers is what is
+causing the shift to farther jump-shots.
+
+
+## NBA 4-Point Line
+
+If the NBA would add a 4-point arc it should be placed at 31 feet away
+from the basket. At this distance players make about 27% of shots which
+leads to a expected value of 1.08 which is the same as the league
+3-point expected value of 1.08. The arc will be 31 feet away at all
+spots and shouldn't have any corner areas. A positive to a 4-point arc
+would be that it would create more spacing on the offense which could
+lead to better driving lines and offensive creativity. A negative could
+be the incentive to take low percentage shots and that could lead to
+less made shots. With less made shots the NBA could lose viewers. In
+2020, Stephen Curry made 41/101 from 30+ feet. If the 4-point shot was
+added in this season he would have averaged 0.6 more points per game
+bringing his average to 32.6.
+
+```{r, echo = FALSE}
+library(pracma)
+
+# Find the hypotenuse of each shot given the x and y coordinates to find the distance from the hoop
+wolves_shots_distance <- wolves_shots_result %>%
+  mutate(shot_distance = hypot(x = coordinate_x_raw - 25, y = coordinate_y_raw))
+
+# Groups shots into distance bins
+# Shots are grouped into 1 foot bins to show the field percentage from each distance away from the hoop.
+distance_summary <- wolves_shots_distance %>%
+  mutate(distance_bin = cut(shot_distance, breaks = seq(0, 40, by = 1))
+  ) %>%
+  group_by(distance_bin) %>%
+  summarise(
+    attempts = n(), makes = sum(result == "Made"), fg_pct = makes / attempts)
+
+# Calculating the expected value of shots
+# Expected value = probability of making shot * point value
+# This allows us to compare efficiency of 3-point vs potential 4-point shots
+distance_summary <- distance_summary %>%
+  mutate(
+    expected_points_3 = fg_pct * 3,
+    expected_points_4 = fg_pct * 4)
+```
